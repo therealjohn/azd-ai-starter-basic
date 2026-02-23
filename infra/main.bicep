@@ -84,6 +84,24 @@ param enableHostedAgents bool
 @description('Enable monitoring for the AI project')
 param enableMonitoring bool = true
 
+@description('Optional. Existing container registry resource ID. If provided, no new ACR will be created and a connection to this ACR will be established.')
+param existingContainerRegistryResourceId string = ''
+
+@description('Optional. Existing container registry endpoint (login server). Required if existingContainerRegistryResourceId is provided.')
+param existingContainerRegistryEndpoint string = ''
+
+@description('Optional. Name of an existing ACR connection on the Foundry project. If provided, no new ACR or connection will be created.')
+param existingAcrConnectionName string = ''
+
+@description('Optional. Existing Application Insights connection string. If provided, a connection will be created but no new App Insights resource.')
+param existingApplicationInsightsConnectionString string = ''
+
+@description('Optional. Existing Application Insights resource ID. Used for connection metadata when providing an existing App Insights.')
+param existingApplicationInsightsResourceId string = ''
+
+@description('Optional. Name of an existing Application Insights connection on the Foundry project. If provided, no new App Insights or connection will be created.')
+param existingAppInsightsConnectionName string = ''
+
 // Tags that should be applied to all resources.
 // 
 // Note that 'azd-service-name' tags should be applied separately to service host resources.
@@ -102,8 +120,10 @@ resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
 
 // Build dependent resources array conditionally
 // Check if ACR already exists in the user-provided array to avoid duplicates
+// Also skip if user provided an existing container registry endpoint or connection name
 var hasAcr = contains(map(aiProjectDependentResources, r => r.resource), 'registry')
-var dependentResources = (enableHostedAgents) && !hasAcr ? union(aiProjectDependentResources, [
+var shouldCreateAcr = enableHostedAgents && !hasAcr && empty(existingContainerRegistryResourceId) && empty(existingAcrConnectionName)
+var dependentResources = shouldCreateAcr ? union(aiProjectDependentResources, [
   {
     resource: 'registry'
     connectionName: 'acr-connection'
@@ -126,6 +146,12 @@ module aiProject 'core/ai/ai-project.bicep' = {
     additionalDependentResources: dependentResources
     enableMonitoring: enableMonitoring
     enableHostedAgents: enableHostedAgents
+    existingContainerRegistryResourceId: existingContainerRegistryResourceId
+    existingContainerRegistryEndpoint: existingContainerRegistryEndpoint
+    existingAcrConnectionName: existingAcrConnectionName
+    existingApplicationInsightsConnectionString: existingApplicationInsightsConnectionString
+    existingApplicationInsightsResourceId: existingApplicationInsightsResourceId
+    existingAppInsightsConnectionName: existingAppInsightsConnectionName
   }
 }
 
@@ -165,4 +191,3 @@ output AZURE_AI_SEARCH_SERVICE_NAME string = aiProject.outputs.dependentResource
 // Azure Storage
 output AZURE_STORAGE_CONNECTION_NAME string = aiProject.outputs.dependentResources.storage.connectionName
 output AZURE_STORAGE_ACCOUNT_NAME string = aiProject.outputs.dependentResources.storage.accountName
-

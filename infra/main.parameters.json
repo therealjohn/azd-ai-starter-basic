@@ -40,6 +40,24 @@
       },
       "enableHostedAgents": {
         "value": "${ENABLE_HOSTED_AGENTS=false}"
+      },
+      "existingContainerRegistryResourceId": {
+        "value": "${AZURE_CONTAINER_REGISTRY_RESOURCE_ID=}"
+      },
+      "existingContainerRegistryEndpoint": {
+        "value": "${AZURE_CONTAINER_REGISTRY_ENDPOINT=}"
+      },
+      "existingAcrConnectionName": {
+        "value": "${AZURE_AI_PROJECT_ACR_CONNECTION_NAME=}"
+      },
+      "existingApplicationInsightsConnectionString": {
+        "value": "${APPLICATIONINSIGHTS_CONNECTION_STRING=}"
+      },
+      "existingApplicationInsightsResourceId": {
+        "value": "${APPLICATIONINSIGHTS_RESOURCE_ID=}"
+      },
+      "existingAppInsightsConnectionName": {
+        "value": "${APPLICATIONINSIGHTS_CONNECTION_NAME=}"
       }
     }
 }

@@ -34,12 +34,36 @@ param enableMonitoring bool = true
 @description('Enable hosted agent deployment')
 param enableHostedAgents bool = false
 
+@description('Optional. Existing container registry resource ID. If provided, a connection will be created to this ACR instead of creating a new one.')
+param existingContainerRegistryResourceId string = ''
+
+@description('Optional. Existing container registry login server (e.g., myregistry.azurecr.io). Required if existingContainerRegistryResourceId is provided.')
+param existingContainerRegistryEndpoint string = ''
+
+@description('Optional. Name of an existing ACR connection on the Foundry project. If provided, no new ACR or connection will be created.')
+param existingAcrConnectionName string = ''
+
+@description('Optional. Existing Application Insights connection string. If provided, a connection will be created but no new App Insights resource.')
+param existingApplicationInsightsConnectionString string = ''
+
+@description('Optional. Existing Application Insights resource ID. Used for connection metadata when providing an existing App Insights.')
+param existingApplicationInsightsResourceId string = ''
+
+@description('Optional. Name of an existing Application Insights connection on the Foundry project. If provided, no new App Insights or connection will be created.')
+param existingAppInsightsConnectionName string = ''
+
 // Load abbreviations
 var abbrs = loadJsonContent('../../abbreviations.json')
 
 // Determine which resources to create based on connections
 var hasStorageConnection = length(filter(additionalDependentResources, conn => conn.resource == 'storage')) > 0
 var hasAcrConnection = length(filter(additionalDependentResources, conn => conn.resource == 'registry')) > 0
+var hasExistingAcr = !empty(existingContainerRegistryResourceId)
+var hasExistingAcrConnection = !empty(existingAcrConnectionName)
+var hasExistingAppInsightsConnection = !empty(existingAppInsightsConnectionName)
+var hasExistingAppInsightsConnectionString = !empty(existingApplicationInsightsConnectionString)
+// Only create new App Insights resources if monitoring enabled and no existing connection/connection string
+var shouldCreateAppInsights = enableMonitoring && !hasExistingAppInsightsConnection && !hasExistingAppInsightsConnectionString
 var hasSearchConnection = length(filter(additionalDependentResources, conn => conn.resource == 'azure_ai_search')) > 0
 var hasBingConnection = length(filter(additionalDependentResources, conn => conn.resource == 'bing_grounding')) > 0
 var hasBingCustomConnection = length(filter(additionalDependentResources, conn => conn.resource == 'bing_custom_grounding')) > 0
@@ -52,7 +76,7 @@ var bingConnectionName = hasBingConnection ? filter(additionalDependentResources
 var bingCustomConnectionName = hasBingCustomConnection ? filter(additionalDependentResources, conn => conn.resource == 'bing_custom_grounding')[0].connectionName : ''
 
 // Enable monitoring via Log Analytics and Application Insights
-module logAnalytics '../monitor/loganalytics.bicep' = if (enableMonitoring) {
+module logAnalytics '../monitor/loganalytics.bicep' = if (shouldCreateAppInsights) {
   name: 'logAnalytics'
   params: {
     location: location
@@ -61,7 +85,7 @@ module logAnalytics '../monitor/loganalytics.bicep' = if (enableMonitoring) {
   }
 }
 
-module applicationInsights '../monitor/applicationinsights.bicep' = if (enableMonitoring) {
+module applicationInsights '../monitor/applicationinsights.bicep' = if (shouldCreateAppInsights) {
   name: 'applicationInsights'
   params: {
     location: location
@@ -134,8 +158,8 @@ resource aiAccount 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
 }
 
 
-// Create connection towards appinsights
-resource appInsightConnection 'Microsoft.CognitiveServices/accounts/projects/connections@2025-04-01-preview' = {
+// Create connection towards appinsights - only if we created a new App Insights resource
+resource appInsightConnection 'Microsoft.CognitiveServices/accounts/projects/connections@2025-04-01-preview' = if (shouldCreateAppInsights) {
   parent: aiAccount::project
   name: 'appi-connection'
   properties: {
@@ -149,6 +173,25 @@ resource appInsightConnection 'Microsoft.CognitiveServices/accounts/projects/con
     metadata: {
       ApiType: 'Azure'
       ResourceId: applicationInsights.outputs.id
+    }
+  }
+}
+
+// Create connection to existing App Insights - if user provided connection string but no existing connection
+resource existingAppInsightConnection 'Microsoft.CognitiveServices/accounts/projects/connections@2025-04-01-preview' = if (enableMonitoring && hasExistingAppInsightsConnectionString && !hasExistingAppInsightsConnection) {
+  parent: aiAccount::project
+  name: 'appi-connection'
+  properties: {
+    category: 'AppInsights'
+    target: existingApplicationInsightsResourceId
+    authType: 'ApiKey'
+    isSharedToAll: true
+    credentials: {
+      key: existingApplicationInsightsConnectionString
+    }
+    metadata: {
+      ApiType: 'Azure'
+      ResourceId: existingApplicationInsightsResourceId
     }
   }
 }
@@ -233,6 +276,49 @@ module acr '../host/acr.bicep' = if (hasAcrConnection) {
   }
 }
 
+// Connection for existing ACR - create if user provided an existing ACR resource ID but no existing connection
+module existingAcrConnection './connection.bicep' = if (hasExistingAcr && !hasExistingAcrConnection) {
+  name: 'existing-acr-connection'
+  params: {
+    aiServicesAccountName: aiAccount.name
+    aiProjectName: aiAccount::project.name
+    connectionConfig: {
+      name: 'acr-connection'
+      category: 'ContainerRegistry'
+      target: existingContainerRegistryEndpoint
+      authType: 'ManagedIdentity'
+      credentials: {
+        clientId: aiAccount::project.identity.principalId
+        resourceId: existingContainerRegistryResourceId
+      }
+      isSharedToAll: true
+      metadata: {
+        ResourceId: existingContainerRegistryResourceId
+      }
+    }
+  }
+}
+
+// Extract resource group name from the existing ACR resource ID
+// Resource ID format: /subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.ContainerRegistry/registries/{name}
+var existingAcrResourceGroup = hasExistingAcr ? split(existingContainerRegistryResourceId, '/')[4] : ''
+var existingAcrName = hasExistingAcr ? last(split(existingContainerRegistryResourceId, '/')) : ''
+
+// Grant AcrPull role to the AI project's managed identity on the existing ACR
+// This allows the hosted agents to pull images from the user-provided registry
+// Note: User must have permission to assign roles on the existing ACR (Owner or User Access Administrator)
+// Using a module allows scoping to a different resource group if the ACR isn't in the same RG
+// Skip if connection already exists (role assignment should already be in place)
+module existingAcrRoleAssignment './acr-role-assignment.bicep' = if (hasExistingAcr && !hasExistingAcrConnection) {
+  name: 'existing-acr-role-assignment'
+  scope: resourceGroup(existingAcrResourceGroup)
+  params: {
+    acrName: existingAcrName
+    acrResourceId: existingContainerRegistryResourceId
+    principalId: aiAccount::project.identity.principalId
+  }
+}
+
 // Bing Search grounding module - deploy if Bing connection is defined in ai.yaml or parameter is enabled
 module bingGrounding '../search/bing_grounding.bicep' = if (hasBingConnection) {
   name: 'bing-grounding'
@@ -274,7 +360,6 @@ module azureAiSearch '../search/azure_ai_search.bicep' = if (hasSearchConnection
   }
 }
 
-
 // Outputs
 output AZURE_AI_PROJECT_ENDPOINT string = aiAccount::project.properties.endpoints['AI Foundry API']
 output AZURE_OPENAI_ENDPOINT string = aiAccount.properties.endpoints['OpenAI Language Model Instance API']
@@ -285,14 +370,14 @@ output aiServicesAccountName string = aiAccount.name
 output aiServicesProjectName string = aiAccount::project.name
 output aiServicesPrincipalId string = aiAccount.identity.principalId
 output projectName string = aiAccount::project.name
-output APPLICATIONINSIGHTS_CONNECTION_STRING string = applicationInsights.outputs.connectionString
+output APPLICATIONINSIGHTS_CONNECTION_STRING string = shouldCreateAppInsights ? applicationInsights.outputs.connectionString : (hasExistingAppInsightsConnectionString ? existingApplicationInsightsConnectionString : '')
 
 // Grouped dependent resources outputs
 output dependentResources object = {
   registry: {
     name: hasAcrConnection ? acr!.outputs.containerRegistryName : ''
-    loginServer: hasAcrConnection ? acr!.outputs.containerRegistryLoginServer : ''
-    connectionName: hasAcrConnection ? acr!.outputs.containerRegistryConnectionName : ''
+    loginServer: hasAcrConnection ? acr!.outputs.containerRegistryLoginServer : ((hasExistingAcr || hasExistingAcrConnection) ? existingContainerRegistryEndpoint : '')
+    connectionName: hasAcrConnection ? acr!.outputs.containerRegistryConnectionName : (hasExistingAcrConnection ? existingAcrConnectionName : (hasExistingAcr ? 'acr-connection' : ''))
   }
   bing_grounding: {
     name: (hasBingConnection) ? bingGrounding!.outputs.bingGroundingName : ''
