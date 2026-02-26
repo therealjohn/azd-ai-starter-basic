@@ -178,7 +178,7 @@ resource appInsightConnection 'Microsoft.CognitiveServices/accounts/projects/con
 }
 
 // Create connection to existing App Insights - if user provided connection string but no existing connection
-resource existingAppInsightConnection 'Microsoft.CognitiveServices/accounts/projects/connections@2025-04-01-preview' = if (enableMonitoring && hasExistingAppInsightsConnectionString && !hasExistingAppInsightsConnection) {
+resource existingAppInsightConnection 'Microsoft.CognitiveServices/accounts/projects/connections@2025-04-01-preview' = if (enableMonitoring && hasExistingAppInsightsConnectionString && !hasExistingAppInsightsConnection && !empty(existingApplicationInsightsResourceId)) {
   parent: aiAccount::project
   name: 'appi-connection'
   properties: {
@@ -371,6 +371,7 @@ output aiServicesProjectName string = aiAccount::project.name
 output aiServicesPrincipalId string = aiAccount.identity.principalId
 output projectName string = aiAccount::project.name
 output APPLICATIONINSIGHTS_CONNECTION_STRING string = shouldCreateAppInsights ? applicationInsights.outputs.connectionString : (hasExistingAppInsightsConnectionString ? existingApplicationInsightsConnectionString : '')
+output APPLICATIONINSIGHTS_RESOURCE_ID string = shouldCreateAppInsights ? applicationInsights.outputs.id : (hasExistingAppInsightsConnectionString ? existingApplicationInsightsResourceId : '')
 
 // Grouped dependent resources outputs
 output dependentResources object = {
