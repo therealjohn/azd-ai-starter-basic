@@ -45,12 +45,6 @@ param resourceGroupName string = 'rg-${environmentName}'
 ])
 param location string
 
-@metadata({azd: {
-  type: 'location'
-  usageName: [
-    'OpenAI.GlobalStandard.gpt-4o-mini,10'
-  ]}
-})
 param aiDeploymentsLocation string
 
 @description('Id of the user or app to assign application roles')
@@ -167,6 +161,7 @@ output AZURE_AI_PROJECT_NAME string = aiProject.outputs.projectName
 output AZURE_AI_PROJECT_ENDPOINT string = aiProject.outputs.AZURE_AI_PROJECT_ENDPOINT
 output AZURE_OPENAI_ENDPOINT string = aiProject.outputs.AZURE_OPENAI_ENDPOINT
 output APPLICATIONINSIGHTS_CONNECTION_STRING string = aiProject.outputs.APPLICATIONINSIGHTS_CONNECTION_STRING
+output APPLICATIONINSIGHTS_RESOURCE_ID string = aiProject.outputs.APPLICATIONINSIGHTS_RESOURCE_ID
 
 // Dependent Resources and Connections
 
