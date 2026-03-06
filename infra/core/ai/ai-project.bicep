@@ -242,6 +242,45 @@ resource projectCognitiveServicesUserRoleAssignment 'Microsoft.Authorization/rol
   }
 }
 
+resource projectCognitiveServicesOpenAIUserRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: aiAccount
+  name: guid(subscription().id, resourceGroup().id, aiAccount::project.name, '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd')
+  properties: {
+    principalId: aiAccount::project.identity.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd')
+  }
+}
+
+resource appInsightsForRbac 'Microsoft.Insights/components@2020-02-02' existing = if (shouldCreateAppInsights) {
+  name: 'appi-${resourceToken}'
+}
+
+resource projectMonitoringMetricsPublisherRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (shouldCreateAppInsights) {
+  scope: appInsightsForRbac
+  name: guid(subscription().id, resourceGroup().id, aiAccount::project.name, '3913510d-42f4-4e42-8a64-420c390055eb')
+  properties: {
+    principalId: aiAccount::project.identity.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', '3913510d-42f4-4e42-8a64-420c390055eb')
+  }
+  dependsOn: [
+    applicationInsights
+  ]
+}
+
+resource localUserMonitoringReaderRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (shouldCreateAppInsights) {
+  scope: appInsightsForRbac
+  name: guid(subscription().id, resourceGroup().id, principalId, '43d0d8ad-25c7-4714-9337-8ba259a9fe05')
+  properties: {
+    principalId: principalId
+    principalType: principalType
+    roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', '43d0d8ad-25c7-4714-9337-8ba259a9fe05')
+  }
+  dependsOn: [
+    applicationInsights
+  ]
+}
 
 // All connections are now created directly within their respective resource modules
 // using the centralized ./connection.bicep module
