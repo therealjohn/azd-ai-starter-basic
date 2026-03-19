@@ -41,6 +41,9 @@
       "enableHostedAgents": {
         "value": "${ENABLE_HOSTED_AGENTS=false}"
       },
+      "enableSelfStorage": {
+        "value": "${ENABLE_SELF_STORAGE=true}"
+      },
       "existingContainerRegistryResourceId": {
         "value": "${AZURE_CONTAINER_REGISTRY_RESOURCE_ID=}"
       },

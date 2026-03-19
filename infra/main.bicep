@@ -75,6 +75,9 @@ var aiProjectDependentResources = json(aiProjectDependentResourcesJson)
 @description('Enable hosted agent deployment')
 param enableHostedAgents bool
 
+@description('Enable self-managed storage for agent conversations. When false and hosted agents are enabled, the capability host is not created.')
+param enableSelfStorage bool = true
+
 @description('Enable monitoring for the AI project')
 param enableMonitoring bool = true
 
@@ -140,6 +143,7 @@ module aiProject 'core/ai/ai-project.bicep' = {
     additionalDependentResources: dependentResources
     enableMonitoring: enableMonitoring
     enableHostedAgents: enableHostedAgents
+    enableSelfStorage: enableSelfStorage
     existingContainerRegistryResourceId: existingContainerRegistryResourceId
     existingContainerRegistryEndpoint: existingContainerRegistryEndpoint
     existingAcrConnectionName: existingAcrConnectionName

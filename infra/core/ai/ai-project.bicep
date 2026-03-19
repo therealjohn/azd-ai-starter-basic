@@ -34,6 +34,9 @@ param enableMonitoring bool = true
 @description('Enable hosted agent deployment')
 param enableHostedAgents bool = false
 
+@description('Enable self-managed storage for agent conversations. When false and hosted agents are enabled, the capability host is not created (v2 hosted agents handle storage automatically).')
+param enableSelfStorage bool = true
+
 @description('Optional. Existing container registry resource ID. If provided, a connection will be created to this ACR instead of creating a new one.')
 param existingContainerRegistryResourceId string = ''
 
@@ -146,7 +149,7 @@ resource aiAccount 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
     ]
   }
 
-  resource aiFoundryAccountCapabilityHost 'capabilityHosts@2025-10-01-preview' = if (enableHostedAgents) {
+  resource aiFoundryAccountCapabilityHost 'capabilityHosts@2025-10-01-preview' = if (enableHostedAgents && enableSelfStorage) {
     name: 'agents'
     properties: {
       capabilityHostKind: 'Agents'
