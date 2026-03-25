@@ -64,6 +64,8 @@ var hasExistingAppInsightsConnection = !empty(existingAppInsightsConnectionName)
 var hasExistingAppInsightsConnectionString = !empty(existingApplicationInsightsConnectionString)
 // Only create new App Insights resources if monitoring enabled and no existing connection/connection string
 var shouldCreateAppInsights = enableMonitoring && !hasExistingAppInsightsConnection && !hasExistingAppInsightsConnectionString
+// Create an appi connection when we're creating new App Insights OR wiring up existing App Insights
+var shouldCreateAppiConnection = shouldCreateAppInsights || (enableMonitoring && hasExistingAppInsightsConnectionString && !hasExistingAppInsightsConnection && !empty(existingApplicationInsightsResourceId))
 var hasSearchConnection = length(filter(additionalDependentResources, conn => conn.resource == 'azure_ai_search')) > 0
 var hasBingConnection = length(filter(additionalDependentResources, conn => conn.resource == 'bing_grounding')) > 0
 var hasBingCustomConnection = length(filter(additionalDependentResources, conn => conn.resource == 'bing_custom_grounding')) > 0
@@ -158,40 +160,21 @@ resource aiAccount 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
 }
 
 
-// Create connection towards appinsights - only if we created a new App Insights resource
-resource appInsightConnection 'Microsoft.CognitiveServices/accounts/projects/connections@2025-04-01-preview' = if (shouldCreateAppInsights) {
+// Create connection towards App Insights - either newly created or existing
+resource appInsightConnection 'Microsoft.CognitiveServices/accounts/projects/connections@2025-04-01-preview' = if (shouldCreateAppiConnection) {
   parent: aiAccount::project
   name: 'appi-connection'
   properties: {
     category: 'AppInsights'
-    target: applicationInsights.outputs.id
+    target: shouldCreateAppInsights ? applicationInsights.outputs.id : existingApplicationInsightsResourceId
     authType: 'ApiKey'
     isSharedToAll: true
     credentials: {
-      key: applicationInsights.outputs.connectionString
+      key: shouldCreateAppInsights ? applicationInsights.outputs.connectionString : existingApplicationInsightsConnectionString
     }
     metadata: {
       ApiType: 'Azure'
-      ResourceId: applicationInsights.outputs.id
-    }
-  }
-}
-
-// Create connection to existing App Insights - if user provided connection string but no existing connection
-resource existingAppInsightConnection 'Microsoft.CognitiveServices/accounts/projects/connections@2025-04-01-preview' = if (enableMonitoring && hasExistingAppInsightsConnectionString && !hasExistingAppInsightsConnection && !empty(existingApplicationInsightsResourceId)) {
-  parent: aiAccount::project
-  name: 'appi-connection'
-  properties: {
-    category: 'AppInsights'
-    target: existingApplicationInsightsResourceId
-    authType: 'ApiKey'
-    isSharedToAll: true
-    credentials: {
-      key: existingApplicationInsightsConnectionString
-    }
-    metadata: {
-      ApiType: 'Azure'
-      ResourceId: existingApplicationInsightsResourceId
+      ResourceId: shouldCreateAppInsights ? applicationInsights.outputs.id : existingApplicationInsightsResourceId
     }
   }
 }
