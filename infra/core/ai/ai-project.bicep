@@ -205,13 +205,7 @@ module aiConnections './connection.bicep' = [for (connection, index) in connecti
   params: {
     aiServicesAccountName: aiAccount.name
     aiProjectName: aiAccount::project.name
-    connectionConfig: {
-      name: connection.name
-      category: connection.category
-      target: connection.target
-      authType: connection.authType
-    }
-    apiKey: '' // API keys should be provided via secure parameters or Key Vault
+    connectionConfig: connection
   }
 }]
 

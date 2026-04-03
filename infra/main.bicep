@@ -62,6 +62,7 @@ param aiFoundryProjectName string = 'ai-project-${environmentName}'
 @description('List of model deployments')
 param aiProjectDeploymentsJson string = '[]'
 
+@secure()
 @description('List of connections')
 param aiProjectConnectionsJson string = '[]'
 
