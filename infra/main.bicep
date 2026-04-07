@@ -156,13 +156,12 @@ module aiProject 'core/ai/ai-project.bicep' = {
 // Resources
 output AZURE_RESOURCE_GROUP string = resourceGroupName
 output AZURE_AI_ACCOUNT_ID string = aiProject.outputs.accountId
-output AZURE_AI_PROJECT_ID string = aiProject.outputs.projectId
-output AZURE_AI_FOUNDRY_PROJECT_ID string = aiProject.outputs.projectId
+output FOUNDRY_PROJECT_ARM_ID string = aiProject.outputs.projectId
 output AZURE_AI_ACCOUNT_NAME string = aiProject.outputs.aiServicesAccountName
 output AZURE_AI_PROJECT_NAME string = aiProject.outputs.projectName
 
 // Endpoints
-output AZURE_AI_PROJECT_ENDPOINT string = aiProject.outputs.AZURE_AI_PROJECT_ENDPOINT
+output FOUNDRY_PROJECT_ENDPOINT string = aiProject.outputs.FOUNDRY_PROJECT_ENDPOINT
 output AZURE_OPENAI_ENDPOINT string = aiProject.outputs.AZURE_OPENAI_ENDPOINT
 output APPLICATIONINSIGHTS_CONNECTION_STRING string = aiProject.outputs.APPLICATIONINSIGHTS_CONNECTION_STRING
 output APPLICATIONINSIGHTS_RESOURCE_ID string = aiProject.outputs.APPLICATIONINSIGHTS_RESOURCE_ID
